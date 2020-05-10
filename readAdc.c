@@ -7,7 +7,10 @@
 #include <string.h>
 
 
-#define SLAVE_ADDR 0x48
+#define MOISTURE_I2C_ADDRESS 0x48
+
+
+
 
 
 int post2thingspeak(float value){
@@ -32,28 +35,20 @@ int post2thingspeak(float value){
 }
 
 
-int main() {
-    int deviceFile_i2c;
-    uint8_t buffer[10];
+float getMoisture(int deviceFile_i2c, int meancount){
     int16_t result;     // 16bit adc result
-
-    // Check if on board i2c device is available (bcm2708)
-    if ((deviceFile_i2c = open("/dev/i2c-1", O_RDWR)) < 0){
-        printf("Error: Couldn't open device! %d\n", deviceFile_i2c);
-        return 1;
-    }
-
-    // init connection
-    if (ioctl(deviceFile_i2c, I2C_SLAVE, SLAVE_ADDR) < 0){
-        printf("Error: Couldn't find device on address!\n");
-        return 1;
-    }
-
+    uint8_t buffer[10];
     float valuesum = 0;
     float meanvalue = 0;
     int counter = 0;
-    int meancount = 100;
-    for (;;){
+
+    // init connection
+    if (ioctl(deviceFile_i2c, I2C_SLAVE, MOISTURE_I2C_ADDRESS) < 0){
+        printf("Error: Couldn't find device on address!\n");
+        return (float)1;
+    }
+
+    for(int i = 0; i < meancount; i++){
         // set config register and start conversion
         buffer[0] = 0x01;   // set address pointer - 1 == config register
         buffer[1] = 0xc3;   // set 1. config register [0:5]
@@ -91,25 +86,32 @@ int main() {
 
         counter ++;
         valuesum += (float)result * 4.096/32768.0;
-        if(counter == meancount){
-            meanvalue = valuesum/meancount;
-
-            meanvalue = (1 - (meanvalue - 1.063)/(2.782 - 1.063)) * 100;
-            printf("raw, %f\n", meanvalue);
-            post2thingspeak(meanvalue);
-            counter = 0;
-            valuesum = 0;
-
-            //printf("Hex: 0x%02x%02x - Int: %d - Float, converted: %f V\n",
-                //buffer[0], buffer[1], meanvalue, (float)meanvalue*4.096/32768.0);
-            sleep(60);
-        }
-
-        // print result
-        usleep(50 * 1000);
-        }
-
+        usleep(10 * 1000);
+    }
     close(deviceFile_i2c);
+
+    // calculate mean value of moisture
+    meanvalue = valuesum/meancount;
+    meanvalue = (1 - (meanvalue - 1.063)/(2.782 - 1.063)) * 100;
+
+    return meanvalue;
+}
+
+
+int main() {
+    int deviceFile_i2c;
+    float moisture = 0;
+
+    // Check if on board i2c device is available (bcm2708)
+    if ((deviceFile_i2c = open("/dev/i2c-1", O_RDWR)) < 0){
+        printf("Error: Couldn't open device! %d\n", deviceFile_i2c);
+        return 1;
+    }
+
+    moisture = getMoisture(deviceFile_i2c, 10);
+    printf("Moisture: %0.3f %\n", moisture);
+    post2thingspeak(moisture);
+
     return 0;
 }
 
