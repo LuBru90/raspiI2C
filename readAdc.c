@@ -6,13 +6,21 @@
 #include <curl/curl.h>
 #include <string.h>
 
-
 #define MOISTURE_I2C_ADDRESS 0x48
+#define BME280_I2C_ADDRESS 0x76
 
 
+int i2cInit(){
+    // Check if on board i2c device is available (bcm2708)
+    int masterDev;
+    if ((masterDev = open("/dev/i2c-1", O_RDWR)) < 0){
+        printf("Error: Couldn't open device! %d\n", masterDev);
+        return 1;
+    }
+    return masterDev;
+}
 
-
-
+// TODO: add field selection
 int post2thingspeak(float value){
     CURL *curl = curl_easy_init();
     if(curl){
@@ -35,7 +43,9 @@ int post2thingspeak(float value){
 }
 
 
-float getMoisture(int deviceFile_i2c, int meancount){
+// TODO: refactor to read a1 to a4
+// float readADC(channel = x)
+float getMoisture(int masterDev, int meancount){
     int16_t result;     // 16bit adc result
     uint8_t buffer[10];
     float valuesum = 0;
@@ -43,7 +53,7 @@ float getMoisture(int deviceFile_i2c, int meancount){
     int counter = 0;
 
     // init connection
-    if (ioctl(deviceFile_i2c, I2C_SLAVE, MOISTURE_I2C_ADDRESS) < 0){
+    if (ioctl(masterDev, I2C_SLAVE, MOISTURE_I2C_ADDRESS) < 0){
         printf("Error: Couldn't find device on address!\n");
         return (float)1;
     }
@@ -56,27 +66,27 @@ float getMoisture(int deviceFile_i2c, int meancount){
         // 0x85 - 0xc3 = 1000 0101 - 1100 0011
 
         // write to i2c bus
-        if (write(deviceFile_i2c, buffer, 3) != 3){
+        if (write(masterDev, buffer, 3) != 3){
             perror("Write to register 1");
             exit(-1);
         }
 
         // wait for conversion to complete (msb == 0)
         do {
-            if (read(deviceFile_i2c, buffer, 3) != 3) {
+            if (read(masterDev, buffer, 3) != 3) {
                 perror("Read conversion");
                 exit(-1);
             }
         } while (!(buffer[0] & 0x80));
 
         buffer[0] = 0;
-        if (write(deviceFile_i2c, buffer, 1) != 1){
+        if (write(masterDev, buffer, 1) != 1){
             perror("Write register select");
             exit(-1);
         }
 
         // read result from register
-        if (read(deviceFile_i2c, buffer, 2) != 2){
+        if (read(masterDev, buffer, 2) != 2){
             perror("Read conversion");
             exit(-1);
         }
@@ -88,7 +98,7 @@ float getMoisture(int deviceFile_i2c, int meancount){
         valuesum += (float)result * 4.096/32768.0;
         usleep(10 * 1000);
     }
-    close(deviceFile_i2c);
+    close(masterDev);
 
     // calculate mean value of moisture
     meanvalue = valuesum/meancount;
@@ -97,21 +107,50 @@ float getMoisture(int deviceFile_i2c, int meancount){
     return meanvalue;
 }
 
+float getBME280(int masterDev){
+    int16_t result;     // 16bit adc result
+    uint8_t transmit[10] = {0};
+    uint8_t receive[10] = {0};
+    float convResult;
 
-int main() {
-    int deviceFile_i2c;
-    float moisture = 0;
-
-    // Check if on board i2c device is available (bcm2708)
-    if ((deviceFile_i2c = open("/dev/i2c-1", O_RDWR)) < 0){
-        printf("Error: Couldn't open device! %d\n", deviceFile_i2c);
-        return 1;
+    // init connection
+    if (ioctl(masterDev, I2C_SLAVE, BME280_I2C_ADDRESS) < 0){
+        printf("Error: Couldn't find device on address!\n");
+        return (float)1;
     }
 
-    moisture = getMoisture(deviceFile_i2c, 10);
-    printf("Moisture: %0.3f %\n", moisture);
-    post2thingspeak(moisture);
+    //transmit[0] = 0xd0; // get device id (should be 0x60)
+
+    transmit[0] = 0xf3; // 
+    // write to i2c bus
+    if (write(masterDev, transmit, 1) != 1){
+        perror("Write to register 1");
+        exit(-1);
+    }
+    // read result from register
+    if (read(masterDev, receive, 2) != 2){
+        perror("Read conversion");
+        exit(-1);
+    }
+    printf("TX: %i %i\n", transmit[0], transmit[1]);
+    printf("RX: %i %i\n", receive[0], receive[1]);
+
+    //result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
+    //convResult += (float)result * 4.096/32768.0;
+    return 1;
+}
+
+int main(){
+    int masterDev = i2cInit();
+    float result;
+
+    result = getBME280(masterDev);
+    return 0;
+    result = getMoisture(masterDev, 10);
+    printf("Moisture: %0.3f %\n", result);
+    post2thingspeak(result);
 
     return 0;
 }
+
 
