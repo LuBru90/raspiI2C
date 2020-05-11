@@ -6,6 +6,7 @@
 #include <curl/curl.h>
 #include <string.h>
 
+
 #define MOISTURE_I2C_ADDRESS 0x48
 #define BME280_I2C_ADDRESS 0x76
 
@@ -20,8 +21,8 @@ int i2cInit(){
     return masterDev;
 }
 
-// TODO: add field selection
-int post2thingspeak(float value){
+// TODO: add field selection - for value in values: append fieldx
+void post2thingspeak(float value){
     CURL *curl = curl_easy_init();
     if(curl){
         char value2char[10];
@@ -39,13 +40,12 @@ int post2thingspeak(float value){
         res = curl_easy_perform(curl);
         curl_easy_cleanup(curl);
     }
-    return 0;
 }
 
 
-// TODO: refactor to read a1 to a4
-// float readADC(channel = x)
-float getMoisture(int masterDev, int meancount){
+// TODO: add channel selection - a1 to a4
+float getMoisture(int meancount, int meandelay){
+    int masterDev = i2cInit();
     int16_t result;     // 16bit adc result
     uint8_t buffer[10];
     float valuesum = 0;
@@ -73,7 +73,7 @@ float getMoisture(int masterDev, int meancount){
 
         // wait for conversion to complete (msb == 0)
         do {
-            if (read(masterDev, buffer, 3) != 3) {
+            if (read(masterDev, buffer, 2) != 2) {
                 perror("Read conversion");
                 exit(-1);
             }
@@ -96,7 +96,7 @@ float getMoisture(int masterDev, int meancount){
 
         counter ++;
         valuesum += (float)result * 4.096/32768.0;
-        usleep(10 * 1000);
+        usleep(meandelay);
     }
     close(masterDev);
 
@@ -107,7 +107,45 @@ float getMoisture(int masterDev, int meancount){
     return meanvalue;
 }
 
-float getBME280(int masterDev){
+uint8_t* sendAndRead(uint8_t* transmit, uint8_t* receive, int len){
+    int masterDev = i2cInit();
+
+    // init connection
+    if (ioctl(masterDev, I2C_SLAVE, BME280_I2C_ADDRESS) < 0){
+        printf("Error: Couldn't find device on address!\n");
+        //return (float)1;
+    }
+
+    // write to i2c bus
+    if (write(masterDev, transmit, len) != len){
+        perror("Write to register 1");
+        exit(-1);
+    }
+    // response
+    //usleep(100);
+    //uint8_t receive[10] = {0};
+    if (read(masterDev, receive, 8) != 8){
+        perror("Read conversion");
+        exit(-1);
+    }
+    printf("TX: %i %i %i\n", transmit[0], transmit[1], transmit[2]);
+    printf("RX: ");
+    for(int i = 0; i < 8; i++){
+       printf("%i ", receive[i]);
+       receive[i] = 0;
+    }
+    printf("\n");
+    printf("--------\n");
+    
+    return receive; 
+    //result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
+    //convResult += (float)result * 4.096/32768.0;
+
+}
+
+// TODO: does not work :(
+float getBME280(){
+    int masterDev = i2cInit();
     int16_t result;     // 16bit adc result
     uint8_t transmit[10] = {0};
     uint8_t receive[10] = {0};
@@ -119,38 +157,65 @@ float getBME280(int masterDev){
         return (float)1;
     }
 
-    //transmit[0] = 0xd0; // get device id (should be 0x60)
-
-    transmit[0] = 0xf3; // 
+    // transmit[0] = 0xd0; // get device id (should be 0x60)
+    // set mode
+    transmit[0] = 0xf4; // config register
+    transmit[1] = 0x3;  // set force mode
     // write to i2c bus
-    if (write(masterDev, transmit, 1) != 1){
+    if (write(masterDev, transmit, 2) != 2){
         perror("Write to register 1");
         exit(-1);
     }
-    // read result from register
+    // response
     if (read(masterDev, receive, 2) != 2){
         perror("Read conversion");
         exit(-1);
     }
-    printf("TX: %i %i\n", transmit[0], transmit[1]);
-    printf("RX: %i %i\n", receive[0], receive[1]);
-
+    printf("TX: %i %i %i\n", transmit[0], transmit[1], transmit[2]);
+    printf("RX: %i %i %i\n", receive[0], receive[1], receive[2]);
+ 
     //result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
     //convResult += (float)result * 4.096/32768.0;
     return 1;
 }
 
+void print(char* string){
+    printf("%s\n", string);
+}
+
 int main(){
-    int masterDev = i2cInit();
     float result;
 
-    result = getBME280(masterDev);
+    uint8_t transmit[10] = {0};
+    uint8_t receive[10] = {0};
+    print("");
+    print("Set standby:");
+    transmit[0] = 0xF5;         // control register
+    transmit[1] = 0xE0;         // control register
+    sendAndRead(transmit, receive, 2);
+
+    print("Set mode:");
+    transmit[0] = 0xF4;         // control register
+    transmit[1] = 0x3;          // set force mode - one mesurement
+    sendAndRead(transmit, receive, 2);
+
+    print("Updating:");
+    transmit[0] = 0xF3;         // status register - check if measuring
+    do {
+        sendAndRead(transmit, receive, 1);
+    } while(receive[0] & 0x8);
+
+    usleep(1000);
+    //print("Get Data:");
+    transmit[0] = 0xF7;
+    sendAndRead(transmit, receive, 2);
+
+    //getBME280();
     return 0;
-    result = getMoisture(masterDev, 10);
+    result = getMoisture(10, 1000);
     printf("Moisture: %0.3f %\n", result);
-    post2thingspeak(result);
+    //post2thingspeak(result);
 
     return 0;
 }
-
 
