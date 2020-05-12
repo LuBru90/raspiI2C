@@ -21,6 +21,10 @@ int i2cInit(){
     return masterDev;
 }
 
+void print(char* string){
+    printf("%s\n", string);
+}
+
 // TODO: add field selection - for value in values: append fieldx
 void post2thingspeak(float value){
     CURL *curl = curl_easy_init();
@@ -107,42 +111,6 @@ float getMoisture(int meancount, int meandelay){
     return meanvalue;
 }
 
-uint8_t* sendAndRead(uint8_t* transmit, uint8_t* receive, int len){
-    int masterDev = i2cInit();
-
-    // init connection
-    if (ioctl(masterDev, I2C_SLAVE, BME280_I2C_ADDRESS) < 0){
-        printf("Error: Couldn't find device on address!\n");
-        //return (float)1;
-    }
-
-    // write to i2c bus
-    if (write(masterDev, transmit, len) != len){
-        perror("Write to register 1");
-        exit(-1);
-    }
-    // response
-    //usleep(100);
-    //uint8_t receive[10] = {0};
-    if (read(masterDev, receive, 8) != 8){
-        perror("Read conversion");
-        exit(-1);
-    }
-    printf("TX: %i %i %i\n", transmit[0], transmit[1], transmit[2]);
-    printf("RX: ");
-    for(int i = 0; i < 8; i++){
-       printf("%i ", receive[i]);
-       receive[i] = 0;
-    }
-    printf("\n");
-    printf("--------\n");
-    
-    return receive; 
-    //result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
-    //convResult += (float)result * 4.096/32768.0;
-
-}
-
 // TODO: does not work :(
 float getBME280(){
     int masterDev = i2cInit();
@@ -179,38 +147,72 @@ float getBME280(){
     return 1;
 }
 
-void print(char* string){
-    printf("%s\n", string);
+uint8_t* sendAndRead(int masterDev, uint8_t* transmit, uint8_t* receive, int len, int reclen){
+
+    // write to i2c bus
+    if (write(masterDev, transmit, len) != len){
+        perror("Write to register 1");
+        exit(-1);
+    }
+
+    if (read(masterDev, receive, reclen) != reclen){
+        perror("Read conversion");
+        exit(-1);
+    }
+
+    printf("TX: ");
+    for(int i = 0; i < len; i++){
+       printf("%i ", transmit[i]);
+    }
+    print("");
+
+    printf("RX: ");
+    for(int i = 0; i < reclen; i++){
+       printf("%i ", receive[i]);
+       receive[i] = 0;
+    }
+    printf("\n--------\n");
+    return receive; 
 }
+
 
 int main(){
     float result;
 
     uint8_t transmit[10] = {0};
     uint8_t receive[10] = {0};
-    print("");
+    
+    int masterDev = i2cInit();
+    // init connection
+    if (ioctl(masterDev, I2C_SLAVE, BME280_I2C_ADDRESS) < 0){
+        printf("Error: Couldn't find device on address!\n");
+        //return (float)1;
+    }
+
     print("Set standby:");
     transmit[0] = 0xF5;         // control register
     transmit[1] = 0xE0;         // control register
-    sendAndRead(transmit, receive, 2);
+    sendAndRead(masterDev, transmit, receive, 2, 1);
 
     print("Set mode:");
     transmit[0] = 0xF4;         // control register
-    transmit[1] = 0x3;          // set force mode - one mesurement
-    sendAndRead(transmit, receive, 2);
+    transmit[1] = 0x2;          // set force mode - one mesurement
+    sendAndRead(masterDev, transmit, receive, 2, 1);
 
     print("Updating:");
     transmit[0] = 0xF3;         // status register - check if measuring
     do {
-        sendAndRead(transmit, receive, 1);
+        sendAndRead(masterDev, transmit, receive, 1, 1);
     } while(receive[0] & 0x8);
 
-    usleep(1000);
     //print("Get Data:");
     transmit[0] = 0xF7;
-    sendAndRead(transmit, receive, 2);
+    sendAndRead(masterDev, transmit, receive, 1, 8);
+
+    close(masterDev);
 
     //getBME280();
+
     return 0;
     result = getMoisture(10, 1000);
     printf("Moisture: %0.3f %\n", result);
