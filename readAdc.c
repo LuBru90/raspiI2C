@@ -6,9 +6,24 @@
 #include <curl/curl.h>
 #include <string.h>
 
+#include <wiringPiI2C.h>
+#include <wiringPi.h>
 
-#define MOISTURE_I2C_ADDRESS 0x48
 #define BME280_I2C_ADDRESS 0x76
+#define MOISTURE_I2C_ADDRESS 0x48
+#define TEST_I2C_ADDRESS 0x68
+
+#define PWR_MGMT_1   0x6B
+#define SMPLRT_DIV   0x19
+#define CONFIG       0x1A
+#define GYRO_CONFIG  0x1B
+#define INT_ENABLE   0x38
+#define ACCEL_XOUT_H 0x3B
+#define ACCEL_YOUT_H 0x3D
+#define ACCEL_ZOUT_H 0x3F
+#define GYRO_XOUT_H  0x43
+#define GYRO_YOUT_H  0x45
+#define GYRO_ZOUT_H  0x47
 
 
 int i2cInit(){
@@ -19,6 +34,10 @@ int i2cInit(){
         return 1;
     }
     return masterDev;
+}
+
+void print(char* string){
+    printf("%s\n", string);
 }
 
 // TODO: add field selection - for value in values: append fieldx
@@ -107,114 +126,35 @@ float getMoisture(int meancount, int meandelay){
     return meanvalue;
 }
 
-uint8_t* sendAndRead(uint8_t* transmit, uint8_t* receive, int len){
-    int masterDev = i2cInit();
 
-    // init connection
-    if (ioctl(masterDev, I2C_SLAVE, BME280_I2C_ADDRESS) < 0){
-        printf("Error: Couldn't find device on address!\n");
-        //return (float)1;
-    }
-
-    // write to i2c bus
-    if (write(masterDev, transmit, len) != len){
-        perror("Write to register 1");
-        exit(-1);
-    }
-    // response
-    //usleep(100);
-    //uint8_t receive[10] = {0};
-    if (read(masterDev, receive, 8) != 8){
-        perror("Read conversion");
-        exit(-1);
-    }
-    printf("TX: %i %i %i\n", transmit[0], transmit[1], transmit[2]);
-    printf("RX: ");
-    for(int i = 0; i < 8; i++){
-       printf("%i ", receive[i]);
-       receive[i] = 0;
-    }
-    printf("\n");
-    printf("--------\n");
-    
-    return receive; 
-    //result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
-    //convResult += (float)result * 4.096/32768.0;
-
+short read_raw_data(int fd, int addr){
+    short high_byte,low_byte,value;
+    high_byte = wiringPiI2CReadReg8(fd, addr);
+    low_byte = wiringPiI2CReadReg8(fd, addr+1);
+    value = (high_byte << 8) | low_byte;
+    return value;
 }
 
-// TODO: does not work :(
-float getBME280(){
-    int masterDev = i2cInit();
-    int16_t result;     // 16bit adc result
-    uint8_t transmit[10] = {0};
-    uint8_t receive[10] = {0};
-    float convResult;
 
-    // init connection
-    if (ioctl(masterDev, I2C_SLAVE, BME280_I2C_ADDRESS) < 0){
-        printf("Error: Couldn't find device on address!\n");
-        return (float)1;
-    }
-
-    // transmit[0] = 0xd0; // get device id (should be 0x60)
-    // set mode
-    transmit[0] = 0xf4; // config register
-    transmit[1] = 0x3;  // set force mode
-    // write to i2c bus
-    if (write(masterDev, transmit, 2) != 2){
-        perror("Write to register 1");
-        exit(-1);
-    }
-    // response
-    if (read(masterDev, receive, 2) != 2){
-        perror("Read conversion");
-        exit(-1);
-    }
-    printf("TX: %i %i %i\n", transmit[0], transmit[1], transmit[2]);
-    printf("RX: %i %i %i\n", receive[0], receive[1], receive[2]);
- 
-    //result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
-    //convResult += (float)result * 4.096/32768.0;
-    return 1;
+void MPU6050_Init(int fd){
+    wiringPiI2CWriteReg8 (fd, SMPLRT_DIV, 0x07);    /* Write to sample rate register */    
+    wiringPiI2CWriteReg8 (fd, PWR_MGMT_1, 0x01);    /* Write to power management register */
+    wiringPiI2CWriteReg8 (fd, CONFIG, 0);       /* Write to Configuration register */
+    wiringPiI2CWriteReg8 (fd, GYRO_CONFIG, 24); /* Write to Gyro Configuration register */
+    wiringPiI2CWriteReg8 (fd, INT_ENABLE, 0x01);    /*Write to interrupt enable register */ 
 }
 
-void print(char* string){
-    printf("%s\n", string);
-}
 
 int main(){
-    float result;
-
-    uint8_t transmit[10] = {0};
-    uint8_t receive[10] = {0};
-    print("");
-    print("Set standby:");
-    transmit[0] = 0xF5;         // control register
-    transmit[1] = 0xE0;         // control register
-    sendAndRead(transmit, receive, 2);
-
-    print("Set mode:");
-    transmit[0] = 0xF4;         // control register
-    transmit[1] = 0x3;          // set force mode - one mesurement
-    sendAndRead(transmit, receive, 2);
-
-    print("Updating:");
-    transmit[0] = 0xF3;         // status register - check if measuring
-    do {
-        sendAndRead(transmit, receive, 1);
-    } while(receive[0] & 0x8);
-
-    usleep(1000);
-    //print("Get Data:");
-    transmit[0] = 0xF7;
-    sendAndRead(transmit, receive, 2);
-
-    //getBME280();
-    return 0;
-    result = getMoisture(10, 1000);
-    printf("Moisture: %0.3f %\n", result);
+    float result =  getMoisture(10, 100);
+    printf("Result: %f %\n", result);
     //post2thingspeak(result);
+    
+    int fd = wiringPiI2CSetup(TEST_I2C_ADDRESS);
+    MPU6050_Init(fd);
+    short data = read_raw_data(fd, ACCEL_XOUT_H);
+    float Ax = data/16384.0;
+    printf("%.3f\n", Ax);
 
     return 0;
 }

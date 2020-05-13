@@ -1,4 +1,4 @@
 default:
-	gcc readAdc.c -l curl -o main
+	gcc readAdc.c -l curl -l wiringPi -o main
 
 
