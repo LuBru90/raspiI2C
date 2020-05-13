@@ -186,32 +186,6 @@ void print(char* string){
 int main(){
     float result;
 
-    uint8_t transmit[10] = {0};
-    uint8_t receive[10] = {0};
-    print("");
-    print("Set standby:");
-    transmit[0] = 0xF5;         // control register
-    transmit[1] = 0xE0;         // control register
-    sendAndRead(transmit, receive, 2);
-
-    print("Set mode:");
-    transmit[0] = 0xF4;         // control register
-    transmit[1] = 0x3;          // set force mode - one mesurement
-    sendAndRead(transmit, receive, 2);
-
-    print("Updating:");
-    transmit[0] = 0xF3;         // status register - check if measuring
-    do {
-        sendAndRead(transmit, receive, 1);
-    } while(receive[0] & 0x8);
-
-    usleep(1000);
-    //print("Get Data:");
-    transmit[0] = 0xF7;
-    sendAndRead(transmit, receive, 2);
-
-    //getBME280();
-    return 0;
     result = getMoisture(10, 1000);
     printf("Moisture: %0.3f %\n", result);
     //post2thingspeak(result);
