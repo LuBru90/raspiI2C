@@ -30,19 +30,34 @@ void print(char* string){
     printf("%s\n", string);
 }
 
-// TODO: add field selection - for value in values: append fieldx
-void post2thingspeak(float value){
+int post2thingspeak(float* values, int size){
     CURL *curl = curl_easy_init();
     if(curl){
         char value2char[10];
         char message[100];
+        char num[1];
+
         // convert float to char array and append to message
-        sprintf(value2char, "%f", value);
-        strcpy(message, "https://api.thingspeak.com/update?api_key=7WM9WPRIQDV1FW0S&field1=");
-        strcat(message, value2char);
+        strcpy(message, "https://api.thingspeak.com/update?api_key=7WM9WPRIQDV1FW0S");
+        //strcpy(message, "https://api.thingspeak.com/update?api_key=7WM9WPRIQDV1FW0S&field1=");
+        if(size > 1){
+            // append fields
+            for(int i = 0; i < size; i++){
+                strcat(message, "&field");
+                sprintf(num, "%d", i + 1);
+                strcat(message, num);
+                strcat(message, "=");
+                sprintf(value2char, "%.3f", values[i]);
+                strcat(message, value2char);
+            }
+        } else{
+            strcat(message, "&field1=");
+            sprintf(value2char, "%f", values[0]);
+            strcat(message, value2char);
+        }
 
         printf("http GET: %s\n", message);
-
+        //return 0;
         // send http GET with curl
         CURLcode res;
         curl_easy_setopt(curl, CURLOPT_URL, message);
@@ -51,8 +66,6 @@ void post2thingspeak(float value){
     }
 }
 
-
-// TODO: add channel selection - a1 to a4
 float getVoltge(int meancount, int meandelay, int channel){
     int masterDev = i2cInit();
     int16_t result;     // 16bit adc result
@@ -120,15 +133,17 @@ float convertU2Moist(float voltage){
 }
 
 int main(){
-    float result;
+    float results[2] = {0};
 
-    result = getVoltge(10, 1000, ADS1115_CHANNEL_1);
-    result = convertU2Moist(result);
-    printf("Moisture: %0.3f %\n", result);
+    results[0] = getVoltge(10, 1000, ADS1115_CHANNEL_1);
+    results[0] = convertU2Moist(results[0]);
+    printf("Moisture: %0.3f %\n", results[0]);
     
-    result = getVoltge(10, 1000, ADS1115_CHANNEL_0);
-    printf("Voltage: %0.3f V\n", result);
-    //post2thingspeak(result);
+    results[1] = getVoltge(10, 1000, ADS1115_CHANNEL_0);
+    printf("Voltage: %0.3f V\n", results[1]);
+
+    int size = sizeof(results)/sizeof(results[0]);
+    post2thingspeak(results, size);
 
     return 0;
 }
