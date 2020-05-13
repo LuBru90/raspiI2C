@@ -142,8 +142,7 @@ float getBME280(){
     printf("TX: %i %i %i\n", transmit[0], transmit[1], transmit[2]);
     printf("RX: %i %i %i\n", receive[0], receive[1], receive[2]);
  
-    //result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
-    //convResult += (float)result * 4.096/32768.0;
+    close(masterDev);
     return 1;
 }
 
@@ -154,6 +153,7 @@ uint8_t* sendAndRead(int masterDev, uint8_t* transmit, uint8_t* receive, int len
         perror("Write to register 1");
         exit(-1);
     }
+    usleep(10);
 
     if (read(masterDev, receive, reclen) != reclen){
         perror("Read conversion");
@@ -178,46 +178,14 @@ uint8_t* sendAndRead(int masterDev, uint8_t* transmit, uint8_t* receive, int len
 
 int main(){
     float result;
-
     uint8_t transmit[10] = {0};
     uint8_t receive[10] = {0};
-    
-    int masterDev = i2cInit();
-    // init connection
-    if (ioctl(masterDev, I2C_SLAVE, BME280_I2C_ADDRESS) < 0){
-        printf("Error: Couldn't find device on address!\n");
-        //return (float)1;
-    }
 
-    print("Set standby:");
-    transmit[0] = 0xF5;         // control register
-    transmit[1] = 0xE0;         // control register
-    sendAndRead(masterDev, transmit, receive, 2, 1);
-
-    print("Set mode:");
-    transmit[0] = 0xF4;         // control register
-    transmit[1] = 0x2;          // set force mode - one mesurement
-    sendAndRead(masterDev, transmit, receive, 2, 1);
-
-    print("Updating:");
-    transmit[0] = 0xF3;         // status register - check if measuring
-    do {
-        sendAndRead(masterDev, transmit, receive, 1, 1);
-    } while(receive[0] & 0x8);
-
-    //print("Get Data:");
-    transmit[0] = 0xF7;
-    sendAndRead(masterDev, transmit, receive, 1, 8);
-
-    close(masterDev);
-
-    //getBME280();
-
-    return 0;
-    result = getMoisture(10, 1000);
-    printf("Moisture: %0.3f %\n", result);
+    result =  getMoisture(10, 100);
+    printf("Result: %f %\n", result);
     //post2thingspeak(result);
 
+    //getBME280();
     return 0;
 }
 
