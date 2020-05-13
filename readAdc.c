@@ -6,6 +6,11 @@
 #include <curl/curl.h>
 #include <string.h>
 
+// ADS1115
+#define ADS1115_CHANNEL_0 0xC3
+#define ADS1115_CHANNEL_1 0xD3
+#define ADS1115_CHANNEL_2 0xE3
+#define ADS1115_CHANNEL_3 0xF3
 
 #define MOISTURE_I2C_ADDRESS 0x48
 #define BME280_I2C_ADDRESS 0x76
@@ -19,6 +24,10 @@ int i2cInit(){
         return 1;
     }
     return masterDev;
+}
+
+void print(char* string){
+    printf("%s\n", string);
 }
 
 // TODO: add field selection - for value in values: append fieldx
@@ -44,12 +53,12 @@ void post2thingspeak(float value){
 
 
 // TODO: add channel selection - a1 to a4
-float getMoisture(int meancount, int meandelay){
+float getVoltge(int meancount, int meandelay, int channel){
     int masterDev = i2cInit();
     int16_t result;     // 16bit adc result
     uint8_t buffer[10];
     float valuesum = 0;
-    float meanvalue = 0;
+    float voltage = 0;
     int counter = 0;
 
     // init connection
@@ -61,9 +70,8 @@ float getMoisture(int meancount, int meandelay){
     for(int i = 0; i < meancount; i++){
         // set config register and start conversion
         buffer[0] = 0x01;   // set address pointer - 1 == config register
-        buffer[1] = 0xc3;   // set 1. config register [0:5]
-        buffer[2] = 0x85;   // set 2. config register [6:15]
-        // 0x85 - 0xc3 = 1000 0101 - 1100 0011
+        buffer[1] = channel;   // set 1. config register [6:15]
+        buffer[2] = 0x85;   // set 2. config register [0:5]
 
         // write to i2c bus
         if (write(masterDev, buffer, 3) != 3){
@@ -101,95 +109,26 @@ float getMoisture(int meancount, int meandelay){
     close(masterDev);
 
     // calculate mean value of moisture
-    meanvalue = valuesum/meancount;
-    meanvalue = (1 - (meanvalue - 1.063)/(2.782 - 1.063)) * 100;
+    voltage = valuesum/meancount;
+    //voltage = (1 - (voltage - 1.063)/(2.782 - 1.063)) * 100;
 
-    return meanvalue;
+    return voltage;
 }
 
-uint8_t* sendAndRead(uint8_t* transmit, uint8_t* receive, int len){
-    int masterDev = i2cInit();
-
-    // init connection
-    if (ioctl(masterDev, I2C_SLAVE, BME280_I2C_ADDRESS) < 0){
-        printf("Error: Couldn't find device on address!\n");
-        //return (float)1;
-    }
-
-    // write to i2c bus
-    if (write(masterDev, transmit, len) != len){
-        perror("Write to register 1");
-        exit(-1);
-    }
-    // response
-    //usleep(100);
-    //uint8_t receive[10] = {0};
-    if (read(masterDev, receive, 8) != 8){
-        perror("Read conversion");
-        exit(-1);
-    }
-    printf("TX: %i %i %i\n", transmit[0], transmit[1], transmit[2]);
-    printf("RX: ");
-    for(int i = 0; i < 8; i++){
-       printf("%i ", receive[i]);
-       receive[i] = 0;
-    }
-    printf("\n");
-    printf("--------\n");
-    
-    return receive; 
-    //result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
-    //convResult += (float)result * 4.096/32768.0;
-
-}
-
-// TODO: does not work :(
-float getBME280(){
-    int masterDev = i2cInit();
-    int16_t result;     // 16bit adc result
-    uint8_t transmit[10] = {0};
-    uint8_t receive[10] = {0};
-    float convResult;
-
-    // init connection
-    if (ioctl(masterDev, I2C_SLAVE, BME280_I2C_ADDRESS) < 0){
-        printf("Error: Couldn't find device on address!\n");
-        return (float)1;
-    }
-
-    // transmit[0] = 0xd0; // get device id (should be 0x60)
-    // set mode
-    transmit[0] = 0xf4; // config register
-    transmit[1] = 0x3;  // set force mode
-    // write to i2c bus
-    if (write(masterDev, transmit, 2) != 2){
-        perror("Write to register 1");
-        exit(-1);
-    }
-    // response
-    if (read(masterDev, receive, 2) != 2){
-        perror("Read conversion");
-        exit(-1);
-    }
-    printf("TX: %i %i %i\n", transmit[0], transmit[1], transmit[2]);
-    printf("RX: %i %i %i\n", receive[0], receive[1], receive[2]);
- 
-    //result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
-    //convResult += (float)result * 4.096/32768.0;
-    return 1;
-}
-
-void print(char* string){
-    printf("%s\n", string);
+float convertU2Moist(float voltage){
+    return voltage = (1 - (voltage - 1.063)/(2.782 - 1.063)) * 100;
 }
 
 int main(){
     float result;
 
-    result = getMoisture(10, 1000);
+    result = getVoltge(10, 1000, ADS1115_CHANNEL_1);
+    result = convertU2Moist(result);
     printf("Moisture: %0.3f %\n", result);
+    
+    result = getVoltge(10, 1000, ADS1115_CHANNEL_0);
+    printf("Voltage: %0.3f V\n", result);
     //post2thingspeak(result);
 
     return 0;
 }
-
