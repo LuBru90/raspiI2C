@@ -6,18 +6,19 @@
 #include <curl/curl.h>
 #include <string.h>
 
-// ADS1115
+// ADS1115 konstants
 #define ADS1115_CHANNEL_0 0xC3
 #define ADS1115_CHANNEL_1 0xD3
 #define ADS1115_CHANNEL_2 0xE3
 #define ADS1115_CHANNEL_3 0xF3
+#define ADS1115_ADDR 0x48
 
-#define MOISTURE_I2C_ADDRESS 0x48
-#define BME280_I2C_ADDRESS 0x76
+// BME280 konstants
+#define BME280_I2C_ADDRESS 0x76 // Broken :(
 
 
+// init on board i2c device (BCM2708)
 int i2cInit(){
-    // Check if on board i2c device is available (bcm2708)
     int masterDev;
     if ((masterDev = open("/dev/i2c-1", O_RDWR)) < 0){
         printf("Error: Couldn't open device! %d\n", masterDev);
@@ -26,10 +27,12 @@ int i2cInit(){
     return masterDev;
 }
 
+// helper function
 void print(char* string){
     printf("%s\n", string);
 }
 
+// send data to thingspeak
 int post2thingspeak(float* values, int size){
     CURL *curl = curl_easy_init();
     if(curl){
@@ -39,7 +42,6 @@ int post2thingspeak(float* values, int size){
 
         // convert float to char array and append to message
         strcpy(message, "https://api.thingspeak.com/update?api_key=7WM9WPRIQDV1FW0S");
-        //strcpy(message, "https://api.thingspeak.com/update?api_key=7WM9WPRIQDV1FW0S&field1=");
         if(size > 1){
             // append fields
             for(int i = 0; i < size; i++){
@@ -55,9 +57,7 @@ int post2thingspeak(float* values, int size){
             sprintf(value2char, "%f", values[0]);
             strcat(message, value2char);
         }
-
         printf("http GET: %s\n", message);
-        //return 0;
         // send http GET with curl
         CURLcode res;
         curl_easy_setopt(curl, CURLOPT_URL, message);
@@ -66,20 +66,20 @@ int post2thingspeak(float* values, int size){
     }
 }
 
-float getVoltge(int meancount, int meandelay, int channel){
+// get data from ADS1115
+float getVoltage(int meancount, int meandelay, int channel){
     int masterDev = i2cInit();
-    int16_t result;     // 16bit adc result
-    uint8_t buffer[10];
-    float valuesum = 0;
-    float voltage = 0;
-    int counter = 0;
+    int16_t result;          // 16bit adc result
+    uint8_t buffer[10];      // transmit and receive buffer
+    float valuesum = 0;      // mean value sum
 
     // init connection
-    if (ioctl(masterDev, I2C_SLAVE, MOISTURE_I2C_ADDRESS) < 0){
+    if (ioctl(masterDev, I2C_SLAVE, ADS1115_ADDR) < 0){
         printf("Error: Couldn't find device on address!\n");
         return (float)1;
     }
-
+    
+    // measure multiple times and calculate the mean value to reduce noise
     for(int i = 0; i < meancount; i++){
         // set config register and start conversion
         buffer[0] = 0x01;   // set address pointer - 1 == config register
@@ -115,33 +115,32 @@ float getVoltge(int meancount, int meandelay, int channel){
         // convert to int - lower + upper 
         result = (int16_t)buffer[0]*256 + (uint16_t)buffer[1];
 
-        counter ++;
         valuesum += (float)result * 4.096/32768.0;
         usleep(meandelay);
     }
     close(masterDev);
 
-    // calculate mean value of moisture
-    voltage = valuesum/meancount;
-    //voltage = (1 - (voltage - 1.063)/(2.782 - 1.063)) * 100;
-
-    return voltage;
+    // calculate mean value of voltage and return
+    return valuesum/meancount;
 }
 
+// Convert measured voltage from ADS1115 in % moisture
 float convertU2Moist(float voltage){
     return voltage = (1 - (voltage - 1.063)/(2.782 - 1.063)) * 100;
 }
 
 int main(){
     float results[2] = {0};
-
-    results[0] = getVoltge(10, 1000, ADS1115_CHANNEL_1);
+    
+    // get data from i2c device
+    results[0] = getVoltage(10, 1000, ADS1115_CHANNEL_1);
     results[0] = convertU2Moist(results[0]);
     printf("Moisture: %0.3f %\n", results[0]);
-    
-    results[1] = getVoltge(10, 1000, ADS1115_CHANNEL_0);
+
+    results[1] = getVoltage(10, 1000, ADS1115_CHANNEL_0);
     printf("Voltage: %0.3f V\n", results[1]);
 
+    // send data to thingspeak
     int size = sizeof(results)/sizeof(results[0]);
     post2thingspeak(results, size);
 
