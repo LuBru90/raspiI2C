@@ -1,4 +1,2 @@
 default:
-	gcc readAdc.c -l curl -o main
-
-
+	gcc main.c -l curl -o main
