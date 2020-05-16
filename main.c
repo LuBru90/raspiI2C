@@ -147,11 +147,19 @@ void getSHT21(float *sht21Data){
     transmit[0] = 0xE3;
     write(masterDev, transmit, 1);
 
-    // Wait for measurement to complete -> s. datasheet
-    usleep(150 * 1000);
-
     // Read data
-    read(masterDev, receive, 3);
+    // Wait for measurement to complete: Master not blocking
+    int counter = 0;
+    while (1){
+        usleep(50000);
+        if(read(masterDev, receive, 3) != 3){
+            if(counter >= 5){
+                break;
+            }
+        }
+        counter ++;
+        continue;
+    }
     
     // Convert data
     float data = (float)((receive[0] << 8 | receive[1]) & 0xFFFC);
@@ -184,7 +192,7 @@ int main(){
 
     // Send data to thingspeak
     int size = sizeof(results)/sizeof(results[0]);
-    post2thingspeak(results, size);
+    //post2thingspeak(results, size);
 
     return 0;
 }
