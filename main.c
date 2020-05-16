@@ -192,7 +192,7 @@ int main(){
 
     // Send data to thingspeak
     int size = sizeof(results)/sizeof(results[0]);
-    //post2thingspeak(results, size);
+    post2thingspeak(results, size);
 
     return 0;
 }
