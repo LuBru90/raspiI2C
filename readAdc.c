@@ -13,8 +13,8 @@
 #define ADS1115_CHANNEL_3 0xF3
 #define ADS1115_ADDR 0x48
 
-// BME280 konstants
-#define BME280_I2C_ADDRESS 0x76 // Broken :(
+// SHT21 konstants
+#define SHT21_ADDR 0x40
 
 
 // init on board i2c device (BCM2708)
@@ -37,7 +37,7 @@ int post2thingspeak(float* values, int size){
     CURL *curl = curl_easy_init();
     if(curl){
         char value2char[10];
-        char message[100];
+        char message[200];
         char num[1];
 
         // convert float to char array and append to message
@@ -58,7 +58,8 @@ int post2thingspeak(float* values, int size){
             strcat(message, value2char);
         }
         printf("http GET: %s\n", message);
-        // send http GET with curl
+
+        // Send http GET with curl
         CURLcode res;
         curl_easy_setopt(curl, CURLOPT_URL, message);
         res = curl_easy_perform(curl);
@@ -66,33 +67,33 @@ int post2thingspeak(float* values, int size){
     }
 }
 
-// get data from ADS1115
+// Get data from ADS1115
 float getVoltage(int meancount, int meandelay, int channel){
     int masterDev = i2cInit();
     int16_t result;          // 16bit adc result
     uint8_t buffer[10];      // transmit and receive buffer
     float valuesum = 0;      // mean value sum
-
-    // init connection
+    
+    // Init connection
     if (ioctl(masterDev, I2C_SLAVE, ADS1115_ADDR) < 0){
         printf("Error: Couldn't find device on address!\n");
         return (float)1;
     }
     
-    // measure multiple times and calculate the mean value to reduce noise
+    // Measure multiple times and calculate the mean value to reduce noise
     for(int i = 0; i < meancount; i++){
         // set config register and start conversion
         buffer[0] = 0x01;   // set address pointer - 1 == config register
         buffer[1] = channel;   // set 1. config register [6:15]
         buffer[2] = 0x85;   // set 2. config register [0:5]
 
-        // write to i2c bus
+        // Write to i2c bus
         if (write(masterDev, buffer, 3) != 3){
             perror("Write to register 1");
             exit(-1);
         }
 
-        // wait for conversion to complete (msb == 0)
+        // Wait for conversion to complete (msb == 0)
         do {
             if (read(masterDev, buffer, 2) != 2) {
                 perror("Read conversion");
@@ -100,13 +101,14 @@ float getVoltage(int meancount, int meandelay, int channel){
             }
         } while (!(buffer[0] & 0x80));
 
-        buffer[0] = 0;
+        // Read data
+        buffer[0] = 0;      
         if (write(masterDev, buffer, 1) != 1){
             perror("Write register select");
             exit(-1);
         }
 
-        // read result from register
+        // Read result from register
         if (read(masterDev, buffer, 2) != 2){
             perror("Read conversion");
             exit(-1);
@@ -120,7 +122,7 @@ float getVoltage(int meancount, int meandelay, int channel){
     }
     close(masterDev);
 
-    // calculate mean value of voltage and return
+    // Calculate mean value of voltage and return
     return valuesum/meancount;
 }
 
@@ -129,18 +131,58 @@ float convertU2Moist(float voltage){
     return voltage = (1 - (voltage - 1.063)/(2.782 - 1.063)) * 100;
 }
 
-int main(){
-    float results[2] = {0};
+// get data from sht21: Temperature and relative humidity
+void getSHT21(float *sht21Data){
+    int masterDev = i2cInit();  // file descriptor
+
+    uint8_t transmit[5] = {0};
+    uint8_t receive[5] = {0};
+
+    // Init connection
+    if (ioctl(masterDev, I2C_SLAVE, SHT21_ADDR) < 0){
+        printf("Error: Couldn't find device on address!\n");
+    }
+
+    // Start measurement
+    transmit[0] = 0xE3;
+    write(masterDev, transmit, 1);
+
+    // Wait for measurement to complete -> s. datasheet
+    usleep(150 * 1000);
+
+    // Read data
+    read(masterDev, receive, 3);
     
-    // get data from i2c device
-    results[0] = getVoltage(10, 1000, ADS1115_CHANNEL_1);
-    results[0] = convertU2Moist(results[0]);
-    printf("Moisture: %0.3f %\n", results[0]);
+    // Convert data
+    float data = (float)((receive[0] << 8 | receive[1]) & 0xFFFC);
+    float sensor_tmp = data / 65536.0;
 
-    results[1] = getVoltage(10, 1000, ADS1115_CHANNEL_0);
-    printf("Voltage: %0.3f V\n", results[1]);
+    sht21Data[0] = -46.85 + (175.72 * sensor_tmp);  // Temperature
+    sht21Data[1] = -6.0 + (125.0 * sensor_tmp);     // Humidity
+}
 
-    // send data to thingspeak
+
+int main(){
+    float results[4] = {0};
+    
+    // ADS1115: Get voltages of channel 0 (Moisture) and 1 (Solarcell)
+    float moistureVoltage = getVoltage(10, 1000, ADS1115_CHANNEL_1);
+    results[0] = convertU2Moist(moistureVoltage);           // Moisture in %
+    results[1] = getVoltage(10, 1000, ADS1115_CHANNEL_0);   // Solarvoltage in V
+    
+    // SHT21/HTU21: Get temperature and relative humidity
+    float sht21Data[2] = {0};
+    getSHT21(sht21Data);
+    results[2] = sht21Data[0]; // Temperature in degC
+    results[3] = sht21Data[1]; // Relative humidity in %
+    
+    // Print results
+    printf("ADS1115 - Moisture: %0.3f %\n", results[0]);
+    printf("ADS1115 - Voltage: %0.3f V\n", results[1]);
+    printf("SHT21 - Temperature: %.3f C\n", results[2]);
+    printf("SHT21 - Humidity: %.3f %%\n", results[3]);
+
+    // Send data to thingspeak
     int size = sizeof(results)/sizeof(results[0]);
     post2thingspeak(results, size);
 
