@@ -1,6 +1,11 @@
 # Raspberry Pi I2C | SHT21 | ADS1115
 ### How to use:
 Get API key from [thingspeak](https://www.thingspeak.com) and edit main.c  
+main.c:
+```
+strcpy(message, "https://api.thingspeak.com/update?api_key=XXXXXXXXXXXXXX");
+```
+
 **Compile main.c with Makefile:**
 ```
 make
@@ -31,3 +36,5 @@ Add the following line:
     - https://thingspeak.com/channels/1056994
 - BME280:
     - https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BME280-DS002.pdf
+
+
