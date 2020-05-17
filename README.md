@@ -1,12 +1,13 @@
 # Raspberry Pi I2C | SHT21 | ADS1115
-### Execute process every hour with a cronejob:
+### How to use:
 ```
-Type:
+Get API key from [www.thingspeak.com](thingspeak) and edit main.c
+Compile main.c with Makefile:
+    >> make
+Execute main every hour with a cronjob:
     >> crontab -e
 Add the following line:
-    0 0-23 * * * /main
-Meaning:
-    Execute main every hour X:00
+    0 0-23 * * * mypath/main
 ```
 
 ### TODO:
