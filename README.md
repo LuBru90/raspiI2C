@@ -28,7 +28,7 @@ Add the following line and modifie **mypath**:
 ### Test SHT21 with Python:
 To test the SHT21 sensor you can use the python script in the pysht folder:
 ```
-pyhton pysht/readsht.py
+python pysht/readsht.py
 ```
 
 ### TODO:
