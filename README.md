@@ -1,5 +1,5 @@
 # Raspberry Pi I2C | SHT21 | ADS1115
-### Cronejob:
+### Execute process every hour with a cronejob:
 ```
 Type:
     >> crontab -e
@@ -17,13 +17,12 @@ Meaning:
 - Only turn on sensors before measuring
 
 ### Sources:
-- BME280:
-    - https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BME280-DS002.pdf
-
+- ADS1115:
+    - http://www.ti.com/lit/ds/symlink/ads1114.pdf?&ts=1589711465834
 - SHT21:
     - https://olegkutkov.me/2018/02/21/htu21d-raspberry-pi/    
     - http://www.farnell.com/datasheets/1780639.pdf
-
 - Thingspeak:
     - https://thingspeak.com/channels/1056994
-
+- BME280:
+    - https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BME280-DS002.pdf
