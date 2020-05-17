@@ -1,14 +1,20 @@
 # raspiI2C
 ## Cronejob:
->> crontab -e
-Add: 0 0-23 * * * /main
-Execute main every hour X:00
+> crontab -e
+> Add: 0 0-23 * * * /main
+> Execute main every hour X:00
+
+## TODO:
+- Split programm in to two parts:
+    - Read ADS1115
+    - Read SHT21
+- Only turn on sensors before measuring
 
 ## Sources:
-- bme280:
+- BME280:
     - https://ae-bst.resource.bosch.com/media/_tech/media/datasheets/BST-BME280-DS002.pdf
 
-- sht21:
+- SHT21:
     - https://olegkutkov.me/2018/02/21/htu21d-raspberry-pi/    
     - http://www.farnell.com/datasheets/1780639.pdf
 
