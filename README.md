@@ -3,13 +3,13 @@
 In this project two i2c sensors are used to measure the room temperature, rel. humidity
 brightness and the moisture in the soil of a plant.  
 The used i2c sensors are the **SHT21 (temperature and humidity)** and the **ADS1115
-(brightness and soil moisture).**
+(brightness and moisture in soil).**
 A cronjob is used to send the obtained data every hour to thingspeak.
 S. also Sources.
 
 ### How to use:
 Get API key from your [thingspeak](https://www.thingspeak.com)-channel.  
-Create a file named **apikey.key** and paste your API key in there.
+Create a file named **apikey.key**, which is located in the script directory, and paste your API key in there.
 
 **Compile main.c with Makefile:**
 ```
