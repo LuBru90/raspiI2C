@@ -131,24 +131,9 @@ float convertU2Moist(float voltage){
     return voltage = (1 - (voltage - 1.063)/(2.782 - 1.063)) * 100;
 }
 
-// get data from sht21: Temperature and relative humidity
-void getSHT21(float *sht21Data){
-    int masterDev = i2cInit();  // file descriptor
-
-    uint8_t transmit[5] = {0};
-    uint8_t receive[5] = {0};
-
-    // Init connection
-    if (ioctl(masterDev, I2C_SLAVE, SHT21_ADDR) < 0){
-        printf("Error: Couldn't find device on address!\n");
-    }
-
-    // Start measurement
-    transmit[0] = 0xE3;
-    write(masterDev, transmit, 1);
-
-    // Read data
-    // Wait for measurement to complete: Master not blocking
+// Helper function
+void getSHT21Register(int masterDev, uint8_t transmit, uint8_t *receive){
+    write(masterDev, &transmit, 1);
     int counter = 0;
     while (1){
         usleep(50000);
@@ -160,12 +145,35 @@ void getSHT21(float *sht21Data){
         counter ++;
         continue;
     }
-    
-    // Convert data
-    float data = (float)((receive[0] << 8 | receive[1]) & 0xFFFC);
-    float sensor_tmp = data / 65536.0;
+} 
 
+// get data from sht21: Temperature and relative humidity
+void getSHT21Data(float *sht21Data){
+    int masterDev = i2cInit();  // file descriptor
+    uint8_t receive[5] = {0};
+
+    // Init connection
+    if (ioctl(masterDev, I2C_SLAVE, SHT21_ADDR) < 0){
+        printf("Error: Couldn't find device on address!\n");
+    }
+    
+    getSHT21Register(masterDev, 0xE3, receive); // trigger temperature measurement
+
+    /* Convert data temperature (14 bit):
+       xxxx xxxx << 8 = xxxx xxxx 0000 0000
+       xxxx xxxx 0000 0000 | yyyy yyyy = xxxx xxxx yyyy yyyy
+       xxxx xxxx yyyy yyyy & 0xFFFC = xxxx xxxx yyyy yy00
+       Note: 3. receive[2] => Checksum (not used)
+    */
+    float data = (uint16_t)((receive[0] << 8 | receive[1]) & 0xFFFC);
+    float sensor_tmp = (float) data / 65536.0;
     sht21Data[0] = -46.85 + (175.72 * sensor_tmp);  // Temperature
+ 
+    getSHT21Register(masterDev, 0xE5, receive); // trigger humidity measurement
+    close(masterDev);
+
+    data = (uint16_t)((receive[0] << 8 | receive[1]) & 0xFFF0);
+    sensor_tmp = (float) data / 65536.0;
     sht21Data[1] = -6.0 + (125.0 * sensor_tmp);     // Humidity
 }
 
@@ -179,10 +187,10 @@ int main(){
     results[1] = getVoltage(10, 1000, ADS1115_CHANNEL_0);   // Solarvoltage in V
     
     // SHT21/HTU21: Get temperature and relative humidity
-    float sht21Data[2] = {0};
-    getSHT21(sht21Data);
-    results[2] = sht21Data[0]; // Temperature in degC
-    results[3] = sht21Data[1]; // Relative humidity in %
+    float data[2] = {0};
+    getSHT21Data(data);
+    results[2] = data[0]; // Temperature in degC
+    results[3] = data[1]; // Relative humidity in %
     
     // Print results
     printf("ADS1115 - Moisture: %0.3f %\n", results[0]);
