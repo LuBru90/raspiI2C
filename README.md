@@ -1,11 +1,10 @@
 # Raspberry Pi I2C | SHT21 | ADS1115
 ### How to use:
-Get API key from [thingspeak](https://www.thingspeak.com) and edit main.c  
-main.c:
+Get API key from [thingspeak](https://www.thingspeak.com) and edit **main.c**
+
 ```
 strcpy(message, "https://api.thingspeak.com/update?api_key=XXXXXXXXXXXXXX");
 ```
-
 **Compile main.c with Makefile:**
 ```
 make
