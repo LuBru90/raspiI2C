@@ -22,7 +22,7 @@ crontab -e
 ```
 Add the following line and modifie **mypath**:
 ```
-0 0-23 * * * mypath/main
+0 0-23 * * * cd /mypath && ./main
 ```
 
 ### Test SHT21 with Python:
