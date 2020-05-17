@@ -1,11 +1,11 @@
 # Raspberry Pi I2C | SHT21 | ADS1115
 ### How to use:
-Get API key from [thingspeak](https://www.thingspeak.com) and edit main.c
-Compile main.c with Makefile:
+Get API key from [thingspeak](https://www.thingspeak.com) and edit main.c  
+**Compile main.c with Makefile:**
 ```
 make
 ```
-Execute main every hour with a cronjob:
+**Execute main every hour with a cronjob:**
 ```
 crontab -e
 ```
