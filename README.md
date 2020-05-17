@@ -1,16 +1,19 @@
 # Raspberry Pi I2C | SHT21 | ADS1115
 ### Cronejob:
 ```
-crontab -e
-Add: 0 0-23 * * * /main
-Execute main every hour X:00
+Type:
+    >> crontab -e
+Add the following line:
+    0 0-23 * * * /main
+Meaning:
+    Execute main every hour X:00
 ```
 
 ### TODO:
 - Split programm in to three parts:
-    1. Read ADS1115
-    2. Read SHT21
-    3. Send to Thingspeak 
+    - Read ADS1115
+    - Read SHT21
+    - Send to Thingspeak 
 - Only turn on sensors before measuring
 
 ### Sources:
