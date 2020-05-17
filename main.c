@@ -32,16 +32,27 @@ void print(char* string){
     printf("%s\n", string);
 }
 
+// read api key from file
+void readAPIKeyFromFile(char *apikey){
+    FILE *file;
+    file = fopen("apikey.key", "r");
+    fscanf(file, "%s", apikey);
+    fclose(file);
+}
+
 // send data to thingspeak
 int post2thingspeak(float* values, int size){
     CURL *curl = curl_easy_init();
     if(curl){
         char value2char[10];
         char message[200];
+        char apikey[30];
         char num[1];
 
         // convert float to char array and append to message
-        strcpy(message, "https://api.thingspeak.com/update?api_key=7WM9WPRIQDV1FW0S");
+        strcpy(message, "https://api.thingspeak.com/update?api_key=");
+        readAPIKeyFromFile(apikey);
+        strcat(message, apikey);
         if(size > 1){
             // append fields
             for(int i = 0; i < size; i++){
