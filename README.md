@@ -1,13 +1,17 @@
 # Raspberry Pi I2C | SHT21 | ADS1115
 ### How to use:
 Get API key from [thingspeak](https://www.thingspeak.com) and edit main.c
-```
 Compile main.c with Makefile:
-    >> make
+```
+make
+```
 Execute main every hour with a cronjob:
-    >> crontab -e
+```
+crontab -e
+```
 Add the following line:
-    0 0-23 * * * mypath/main
+```
+0 0-23 * * * mypath/main
 ```
 
 ### TODO:
