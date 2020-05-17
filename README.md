@@ -1,7 +1,7 @@
 # Raspberry Pi 3 b+ | C | I2C | SHT21 | ADS1115 | Thingspeak
 ## About this project
 In this project two i2c sensors are used to measure the room temperature, rel. humidity
-brightess and the moisture in the soil of a plant.  
+brightness and the moisture in the soil of a plant.  
 The used i2c sensors are the **SHT21 (temperature and humidity)** and the **ADS1115
 (brightness and soil moisture).**
 A cronjob is used to send the obtained data every hour to thingspeak.
@@ -15,7 +15,8 @@ Create a file named **apikey.key** and paste your API key in there.
 ```
 make
 ```
-**Execute main every hour with a cronjob:**
+**Execute main every hour with a cronjob:**  
+Open list of cronjobs with the following command:
 ```
 crontab -e
 ```
@@ -31,6 +32,7 @@ pyhton pysht/readsht.py
 ```
 
 ### TODO:
+- Documentation: How to connect sensors to the raspberry pi
 - Split programm in to three parts:
     - Read ADS1115
     - Read SHT21
