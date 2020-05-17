@@ -1,4 +1,5 @@
-# Raspberry Pi 3 b+ | I2C | SHT21 | ADS1115 | Thingspeak
+# Raspberry Pi 3 b+ | C | I2C | SHT21 | ADS1115 | Thingspeak
+## About this project
 In this project two i2c sensors are used to measure the room temperature, rel. humidity
 brightess and the moisture in the soil of a plant.  
 The used i2c sensors are the **SHT21 (temperature and humidity)** and the **ADS1115
@@ -18,9 +19,15 @@ make
 ```
 crontab -e
 ```
-Add the following line:
+Add the following line and modifie **mypath**:
 ```
 0 0-23 * * * mypath/main
+```
+
+### Test SHT21 with Python:
+To test the SHT21 sensor you can use the python script in the pysht folder:
+```
+pyhton pysht/readsht.py
 ```
 
 ### TODO:
